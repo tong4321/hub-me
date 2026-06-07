@@ -36,7 +36,7 @@ import concurrent.futures
 from typing import Optional, Tuple
 
 # ---------------- CONFIG ----------------
-XC_FILE_URL = "https://raw.githubusercontent.com/staycanuca/hub/refs/heads/main/_tools/xc.txt"
+XC_FILE_URL = "https://raw.githubusercontent.com/tong4321/hub-me/refs/heads/main/_tools/xc.txt"
 TMDB_API_KEY = "304ca56b1b7b57ca7a47d9b59946be94"
 
 DB_FILE_LIVE = "iptv_live.db"
