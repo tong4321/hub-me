@@ -40,7 +40,7 @@ jobs:
 
       - name: Run server verification
         env:
-          SERVERS_URL: https://raw.githubusercontent.com/staycanuca/hub/refs/heads/main/_tools/servers.json
+          SERVERS_URL: https://raw.githubusercontent.com/tong4321/hub-me/refs/heads/main/_tools/servers.json
           OUTPUT_FILE: servers.json
         run: python _tools/verify_servers.py
 
