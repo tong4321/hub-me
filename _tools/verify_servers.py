@@ -44,7 +44,7 @@ NEGATIVE_MARKERS = (
 
 SERVERS_URL = os.environ.get(
     "SERVERS_URL",
-    "https://raw.githubusercontent.com/staycanuca/hub/refs/heads/main/_tools/servers.json",
+    "https://raw.githubusercontent.com/tong4321/hub-me/refs/heads/main/_tools/servers.json",
 )
 OUTPUT_FILE = os.environ.get("OUTPUT_FILE", "servers.json")
 GITHUB_OUTPUT = os.environ.get("GITHUB_OUTPUT")
