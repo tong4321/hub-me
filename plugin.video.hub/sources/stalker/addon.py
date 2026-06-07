@@ -47,7 +47,7 @@ def get_pastebin_url():
 STALKER_PASTEBIN_PROFILES_URL = get_pastebin_url()
 STALKER_PASTEBIN_CACHE_FILE = os.path.join(PROFILE_DIR, 'stalker_pastebin_profiles_cache.json')
 STALKER_PASTEBIN_CACHE_DURATION = 3600 # 1 hour in seconds
-STALKER_VALID_MACS_URL = 'https://raw.githubusercontent.com/staycanuca/hub/refs/heads/main/valid_macs.json'
+STALKER_VALID_MACS_URL = 'https://raw.githubusercontent.com/tong4321/hub-me/refs/heads/main/valid_macs.json'
 STALKER_VALID_MACS_CACHE_FILE = os.path.join(PROFILE_DIR, 'stalker_valid_macs_cache.json')
 STALKER_VALID_MACS_CACHE_DURATION = 3600 # 1 hour in seconds
 STALKER_RO_STATUS_FILE = os.path.join(PROFILE_DIR, 'stalker_ro_status.json')
