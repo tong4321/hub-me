@@ -15,7 +15,7 @@ from urllib3.util.retry import Retry
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 TIMEOUT = int(os.environ.get("TIMEOUT", 15))
-PROBE_TIMEOUT = int(os.environ.get("PROBE_TIMEOUT", 5))  # Short timeout for quick version probes
+PROBE_TIMEOUT = int(os.environ.get("PROBE_TIMEOUT", 3))  # Short timeout for quick version probes
 DEFAULT_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 "
@@ -54,8 +54,8 @@ OUTPUT_FILE = os.environ.get("OUTPUT_FILE", "servers.json")
 GITHUB_OUTPUT = os.environ.get("GITHUB_OUTPUT")
 
 # Concurrency tuning (can be overridden via environment variables)
-DEFAULT_POOL_SIZE = int(os.environ.get("DEFAULT_POOL_SIZE", 20))
-MAX_WORKERS = int(os.environ.get("MAX_WORKERS", 10))
+DEFAULT_POOL_SIZE = int(os.environ.get("DEFAULT_POOL_SIZE", 30))
+MAX_WORKERS = int(os.environ.get("MAX_WORKERS", 5))
 
 
 def build_session():
