@@ -6,12 +6,16 @@ import sys
 import time
 import urllib3
 from functools import lru_cache
+import concurrent.futures
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-TIMEOUT = 15
+TIMEOUT = int(os.environ.get("TIMEOUT", 15))
+PROBE_TIMEOUT = int(os.environ.get("PROBE_TIMEOUT", 5))  # Short timeout for quick version probes
 DEFAULT_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 "
@@ -49,10 +53,25 @@ SERVERS_URL = os.environ.get(
 OUTPUT_FILE = os.environ.get("OUTPUT_FILE", "servers.json")
 GITHUB_OUTPUT = os.environ.get("GITHUB_OUTPUT")
 
+# Concurrency tuning (can be overridden via environment variables)
+DEFAULT_POOL_SIZE = int(os.environ.get("DEFAULT_POOL_SIZE", 20))
+MAX_WORKERS = int(os.environ.get("MAX_WORKERS", 10))
+
 
 def build_session():
+    """
+    Build a requests.Session with connection pooling and automatic retries.
+    Reuses TCP/TLS connections and handles transient network errors.
+    """
     session = requests.Session()
     session.headers.update(DEFAULT_HEADERS)
+
+    # Retry strategy for transient errors (5xx)
+    retries = Retry(total=2, backoff_factor=0.5, status_forcelist=(500, 502, 503, 504))
+    adapter = HTTPAdapter(pool_connections=DEFAULT_POOL_SIZE, pool_maxsize=DEFAULT_POOL_SIZE, max_retries=retries)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+
     return session
 
 
@@ -181,7 +200,7 @@ def detect_portal_paths(base_url):
             response = requests.get(
                 version_url,
                 headers=DEFAULT_HEADERS,
-                timeout=TIMEOUT,
+                timeout=PROBE_TIMEOUT,  # Short timeout for quick probes
                 verify=False,
             )
             if response.status_code == 200:
@@ -310,23 +329,29 @@ def check_portal(session, url):
         probe_urls.append(build_endpoint(url, portal_path))
 
     seen = set()
-    for probe_url in probe_urls:
-        if probe_url in seen:
-            continue
-        seen.add(probe_url)
-
-        try:
-            response = session.get(
+    # Probe multiple URLs in parallel with short timeout for quick failure detection
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(probe_urls), MAX_WORKERS)) as executor:
+        futures = {}
+        for probe_url in probe_urls:
+            if probe_url in seen:
+                continue
+            seen.add(probe_url)
+            future = executor.submit(
+                session.get,
                 probe_url,
-                timeout=TIMEOUT,
+                timeout=PROBE_TIMEOUT,
                 verify=False,
                 allow_redirects=True,
             )
-        except requests.RequestException:
-            continue
+            futures[future] = probe_url
 
-        if 200 <= response.status_code < 400:
-            return True
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                response = future.result()
+                if 200 <= response.status_code < 400:
+                    return True
+            except requests.RequestException:
+                continue
 
     return False
 
@@ -444,14 +469,32 @@ def verify_server(server):
     valid_macs = []
     seen_macs = set()
 
+    # Pre-normalize and deduplicate MACs
+    macs_to_check = []
     for raw_mac in server.get("macs", []):
         normalized_mac = normalize_mac(raw_mac)
         if not normalized_mac or normalized_mac in seen_macs:
             continue
-
         seen_macs.add(normalized_mac)
-        if check_mac(session, portal_url, normalized_mac):
-            valid_macs.append(normalized_mac)
+        macs_to_check.append(normalized_mac)
+
+    # Check MACs in parallel using a thread pool for better performance
+    if macs_to_check:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(MAX_WORKERS, len(macs_to_check))) as executor:
+            future_to_mac = {}
+            for mac in macs_to_check:
+                # Create a fresh session per worker for thread-safety
+                future = executor.submit(check_mac, build_session(), portal_url, mac)
+                future_to_mac[future] = mac
+
+            for future in concurrent.futures.as_completed(future_to_mac):
+                mac = future_to_mac[future]
+                try:
+                    if future.result():
+                        valid_macs.append(mac)
+                except Exception:
+                    # Silently skip failed MAC checks
+                    pass
 
     if not valid_macs:
         return portal_works, None
