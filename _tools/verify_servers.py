@@ -478,7 +478,7 @@ def main():
         print(f"  Portal: {'OK' if portal_works else 'FAIL'}")
 
         if valid_macs is None:
-            print("  -> Server invalid sau toate MAC-urile nefunctionale - STERS")
+            print("  -> Invalid server or all MACs not working - STERS")
             continue
 
         server["macs"] = valid_macs
@@ -490,7 +490,7 @@ def main():
     with open(OUTPUT_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
-    print(f"\nTerminat: {len(valid_servers)}/{len(servers)} servere ramase")
+    print(f"\nTerminat: {len(valid_servers)}/{len(servers)} remaining servers")
 
     if GITHUB_OUTPUT:
         with open(GITHUB_OUTPUT, "a") as f:
