@@ -42,6 +42,11 @@ jobs:
         env:
           SERVERS_URL: https://raw.githubusercontent.com/tong4321/hub-me/refs/heads/main/_tools/servers.json
           OUTPUT_FILE: servers.json
+          # ปรับตัวแปร environment เพื่อให้ตรวจสอบเร็วขึ้น
+          TIMEOUT: 10              # ลด timeout จาก 15 เป็น 10 วินาที
+          PROBE_TIMEOUT: 2         # ลด probe timeout จาก 3 เป็น 2 วินาที
+          MAX_WORKERS: 15          # เพิ่ม concurrent workers จาก 5 เป็น 15
+          DEFAULT_POOL_SIZE: 50    # เพิ่ม connection pool จาก 30 เป็น 50
         run: python _tools/verify_servers.py
 
       - name: Check for changes
