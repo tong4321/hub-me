@@ -15,7 +15,7 @@ from urllib3.util.retry import Retry
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 TIMEOUT = int(os.environ.get("TIMEOUT", 15))
-PROBE_TIMEOUT = int(os.environ.get("PROBE_TIMEOUT", 3))  # Short timeout for quick version probes
+PROBE_TIMEOUT = int(os.environ.get("PROBE_TIMEOUT", 2))  # Short timeout for quick version probes
 DEFAULT_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 "
@@ -54,8 +54,9 @@ OUTPUT_FILE = os.environ.get("OUTPUT_FILE", "servers.json")
 GITHUB_OUTPUT = os.environ.get("GITHUB_OUTPUT")
 
 # Concurrency tuning (can be overridden via environment variables)
-DEFAULT_POOL_SIZE = int(os.environ.get("DEFAULT_POOL_SIZE", 30))
-MAX_WORKERS = int(os.environ.get("MAX_WORKERS", 5))
+DEFAULT_POOL_SIZE = int(os.environ.get("DEFAULT_POOL_SIZE", 50))
+MAX_WORKERS = int(os.environ.get("MAX_WORKERS", 15))
+MAX_SERVER_WORKERS = int(os.environ.get("MAX_SERVER_WORKERS", 8))  # Parallel servers
 
 
 def build_session():
@@ -190,23 +191,32 @@ def detect_portal_paths(base_url):
     base_url = base_url.rstrip("/")
     preferred = []
 
+    # Use parallel requests to probe version URLs faster
     version_urls = (
         (f"{base_url}/c/version.js", "portal.php"),
         (f"{base_url}/stalker_portal/c/version.js", "stalker_portal/server/load.php"),
     )
 
-    for version_url, portal_path in version_urls:
-        try:
-            response = requests.get(
+    # Probe version URLs in parallel instead of sequentially
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        futures = {}
+        for version_url, portal_path in version_urls:
+            future = executor.submit(
+                requests.get,
                 version_url,
                 headers=DEFAULT_HEADERS,
-                timeout=PROBE_TIMEOUT,  # Short timeout for quick probes
+                timeout=PROBE_TIMEOUT,
                 verify=False,
             )
-            if response.status_code == 200:
-                preferred.append(portal_path)
-        except requests.RequestException:
-            continue
+            futures[future] = portal_path
+
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                response = future.result()
+                if response.status_code == 200:
+                    preferred.append(futures[future])
+            except requests.RequestException:
+                continue
 
     if "/stalker_portal" in base_url.lower():
         preferred.append("server/load.php")
@@ -514,19 +524,32 @@ def main():
 
     print(f"Verificare {len(servers)} servere...")
 
-    for server in servers:
-        print(f"Verificare server: {server.get('name')} - {server.get('portal_url')}")
+    # MAJOR OPTIMIZATION: Verify servers in parallel instead of sequentially
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_SERVER_WORKERS) as executor:
+        future_to_server = {}
+        for server in servers:
+            future = executor.submit(verify_server, server)
+            future_to_server[future] = server
 
-        portal_works, valid_macs = verify_server(server)
-        print(f"  Portal: {'OK' if portal_works else 'FAIL'}")
+        for future in concurrent.futures.as_completed(future_to_server):
+            server = future_to_server[future]
+            try:
+                portal_works, valid_macs = future.result()
+                server_name = server.get('name', 'Unknown')
+                server_url = server.get('portal_url', 'N/A')
+                print(f"Verificare server: {server_name} - {server_url}")
+                print(f"  Portal: {'OK' if portal_works else 'FAIL'}")
 
-        if valid_macs is None:
-            print("  -> Server invalid sau toate MAC-urile nefunctionale - STERS")
-            continue
+                if valid_macs is None:
+                    print("  -> Server invalid sau toate MAC-urile nefunctionale - STERS")
+                    continue
 
-        server["macs"] = valid_macs
-        valid_servers.append(server)
-        print(f"  -> Server OK, {len(valid_macs)} MAC-uri valide")
+                server["macs"] = valid_macs
+                valid_servers.append(server)
+                print(f"  -> Server OK, {len(valid_macs)} MAC-uri valide")
+            except Exception as e:
+                print(f"  -> Error verificare server: {e}")
+                continue
 
     data["servers"] = valid_servers
 
