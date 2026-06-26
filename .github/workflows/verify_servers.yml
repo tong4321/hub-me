@@ -2,7 +2,7 @@ name: Verify IPTV Servers
 
 on:
   schedule:
-    - cron: '0 */12 * * *'  # Every 12 hours
+    - cron: '0 */20 * * *'  # Every 12 hours
   workflow_dispatch:
   push:
     branches:
@@ -20,7 +20,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 110
+    timeout-minutes: 180
     
     steps:
       - name: Checkout repository
