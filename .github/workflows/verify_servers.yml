@@ -42,12 +42,16 @@ jobs:
         env:
           SERVERS_URL: https://raw.githubusercontent.com/tong4321/hub-me/refs/heads/main/_tools/servers.json
           OUTPUT_FILE: servers.json
-          # ปรับตัวแปร environment เพื่อให้ตรวจสอบเร็วขึ้น
-          TIMEOUT: 10              # ลด timeout จาก 15 เป็น 10 วินาที
-          PROBE_TIMEOUT: 2         # ลด probe timeout จาก 3 เป็น 2 วินาที
-          MAX_WORKERS: 15          # เพิ่ม concurrent workers จาก 5 เป็น 15
-          DEFAULT_POOL_SIZE: 50    # เพิ่ม connection pool จาก 30 เป็น 50
+          TIMEOUT: 8              # ลดจาก 10 เป็น 8 วินาที
+          PROBE_TIMEOUT: 1        # ลดจาก 2 เป็น 1 วินาที
+          MAX_WORKERS: 20         # เพิ่มจาก 15 เป็น 20 (parallel request)
+          MAX_SERVER_WORKERS: 10  # เพิ่มจาก 8 เป็น 10 (verify more servers in parallel)
+          DEFAULT_POOL_SIZE: 50   # เก็บไว้เหมือนเดิม
         run: python _tools/verify_servers.py
+
+      - name: Run server verification with timeout
+        run: |
+          timeout 6000 python _tools/verify_servers.py || echo "Script timeout or failed"
 
       - name: Check for changes
         id: changes
